@@ -21,7 +21,7 @@ win:
 mac:
   icon: resources/icon.icns
   category: public.app-category.productivity
-  identity: null
+  identity: "-"
   target:
     - target: dmg
       arch:
