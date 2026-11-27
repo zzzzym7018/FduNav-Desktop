@@ -22,6 +22,7 @@ mac:
   icon: resources/icon.icns
   category: public.app-category.productivity
   identity: "-"
+  hardenedRuntime: false
   target:
     - target: dmg
       arch:
