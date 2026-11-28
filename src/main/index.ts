@@ -29,12 +29,15 @@ import {registerGeneralSettingsHandlers} from './general-settings'
 import {registerAppInfoHandlers} from './app-info'
 import {registerResearchHandlers} from './research'
 import {registerAssistantHandlers} from './assistant'
+import {registerPluginHandlers, registerPluginScheme} from './plugins'
 
 let stopAssistant: (() => void) | undefined
 let database: AppDatabase | undefined
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let quitting = false
+let plugins: Awaited<ReturnType<typeof registerPluginHandlers>> | undefined
+registerPluginScheme()
 const userDataPath = app.getPath('userData')
 app.setName('FduNav')
 app.setPath('userData', userDataPath)
@@ -70,6 +73,12 @@ function ensureTray() {
         next.setToolTip('FduNav')
         next.setContextMenu(Menu.buildFromTemplate([
             {label: '打开 FduNav', click: showMainWindow},
+            {
+                label: '管理插件', click: () => {
+                    showMainWindow()
+                    plugins?.enterSafeMode(mainWindow)
+                }
+            },
             {type: 'separator'},
             {label: '退出 FduNav', click: () => app.quit()},
         ]))
@@ -150,6 +159,7 @@ function createWindow(): void {
     })
 
     window.setMenu(null)
+    plugins?.attach(window)
     window.webContents.setWindowOpenHandler(() => ({action: 'deny'}))
     window.webContents.on('will-navigate', (event, url) => {
         if (!isAppUrl(url)) event.preventDefault()
@@ -173,6 +183,7 @@ app.whenReady().then(async () => {
         mkdirSync(app.getPath('userData'), {recursive: true})
         database = new AppDatabase(join(app.getPath('userData'), 'fdunav.sqlite'))
         const trusted = (event: IpcMainInvokeEvent) => !!senderWindow(event) && isAppUrl(event.senderFrame?.url ?? '')
+        plugins = await registerPluginHandlers(trusted)
         registerAppInfoHandlers(trusted)
         registerGeneralSettingsHandlers(database, trusted)
         const accounts = await registerAccountHandlers(database, trusted)
