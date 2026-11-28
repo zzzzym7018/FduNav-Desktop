@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
-import type {AssistantState, AssistantSettings, MonitorInput, AssistantRun} from '../../shared/assistant'
+import {validateMonitor, validateAssistantSettings, type AssistantState, type AssistantSettings, type MonitorInput, type AssistantRun} from '../../shared/assistant'
 import type {Result} from '../../shared/accounts'
 import './styles/assistant.css'
 import './styles/llm.css'
@@ -11,6 +11,7 @@ const statusLabel: Record<AssistantRun['status'], string> = {queued: '等待检�
 const date = (value: number) => new Date(value).toLocaleString('zh-CN', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'})
 
 export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm' | 'mail' | 'account') => void; onOpenMail: (id: string) => Promise<void>}) {
+    useEffect(() => {const before = document.title; document.title = '主动助手 · FduNav'; return () => {document.title = before}}, [])
     const api = window.assistant
     const [state, setState] = useState<AssistantState | null>(null)
     const [error, setError] = useState('')
@@ -23,6 +24,8 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
     const [filter, setFilter] = useState<'attention' | 'all'>('attention')
     const lifecycle = useRef(0), sequence = useRef(0), locked = useRef(false)
     const heading = useRef<HTMLHeadingElement>(null), nameInput = useRef<HTMLInputElement>(null)
+    const reload = useRef<(() => Promise<void>) | null>(null), refreshPending = useRef(false)
+    const lastLimit = useRef<number | null>(null)
     const [dailyLimit, setDailyLimit] = useState('24')
     useEffect(() => {
         if (!api) {setLoading(false); return}
@@ -32,14 +35,15 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
             try {
                 const result = await api!.get()
                 if (generation !== lifecycle.current || request !== sequence.current) return
-                if (result.ok) {setState(result.data); setDailyLimit(String(result.data.settings.dailyLimit))}
+                if (result.ok) {setState(result.data); setDailyLimit(current => locked.current ? current : result.data.settings.dailyLimit === lastLimit.current ? current : String(result.data.settings.dailyLimit)); lastLimit.current = result.data.settings.dailyLimit}
                 else setError(result.error)
             } catch {if (generation === lifecycle.current) setError('无法读取主动助手，请重试。')}
             finally {if (generation === lifecycle.current) setLoading(false)}
         }
+        reload.current = load
         void load()
-        const unsubscribe = api.onChanged(() => {if (!locked.current) void load()})
-        return () => {lifecycle.current++; unsubscribe()}
+        const unsubscribe = api.onChanged(() => {if (!locked.current) void load(); else refreshPending.current = true})
+        return () => {lifecycle.current++; reload.current = null; unsubscribe()}
     }, [api])
     useEffect(() => {if (draft) nameInput.current?.focus()}, [!!draft])
     async function perform(action: () => Promise<Result<AssistantState>>, success: string, after?: () => void) {
@@ -52,7 +56,7 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
             if (result.ok) {setState(result.data); setDailyLimit(String(result.data.settings.dailyLimit)); setFeedback(success); after?.()}
             else setError(result.error)
         } catch {if (generation === lifecycle.current) setError('操作未完成，请重试。你的输入已保留。')}
-        finally {locked.current = false; if (generation === lifecycle.current) {setBusy(false); setLoading(false)}}
+        finally {locked.current = false; if (generation === lifecycle.current) {setBusy(false); setLoading(false); if (refreshPending.current) {refreshPending.current = false; void reload.current?.()}}}
     }
     async function openMail(id: string) {
         if (locked.current) return
@@ -90,12 +94,12 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
                     {!draft && <button className="assistant-primary" type="button" disabled={!signedIn || busy} onClick={() => setDraft(freshMonitor('mail'))}>添加监控</button>}</div>
                 {state.monitors.length === 0 && !draft && <div className="assistant-empty"><strong>从一件值得留意的事开始</strong><p>比如新邮件中的截止时间，或未来几天的安排冲突。</p>
                     <div className="assistant-actions"><button type="button" disabled={!signedIn || busy} onClick={() => setDraft(freshMonitor('mail'))}>留意重要新邮件</button><button type="button" disabled={!signedIn || busy} onClick={() => setDraft(freshMonitor('schedule'))}>检查近期安排</button></div></div>}
-                {draft && <form className="assistant-form" onSubmit={event => {event.preventDefault(); void perform(() => api!.saveMonitor(draft), '监控已保存。', () => {setDraft(null); heading.current?.focus()})}}>
+                {draft && <form noValidate className="assistant-form" onSubmit={event => {event.preventDefault(); try {validateMonitor(draft)} catch (error) {setError(error instanceof Error ? error.message : '请检查输入。'); return} void perform(() => api!.saveMonitor(draft), '监控已保存。', () => {setDraft(null); heading.current?.focus()})}}>
                     <h4>{draft.id ? '编辑监控' : '添加监控'}</h4>
                     <label>监控名称<input ref={nameInput} value={draft.name} maxLength={60} required disabled={busy} onChange={event => setDraft({...draft, name: event.target.value})}/></label>
                     <label>关注资料<select value={draft.source} disabled={busy} onChange={event => setDraft({...freshMonitor(event.target.value as 'mail' | 'schedule'), id: draft.id})}>
                         <option value="mail">新邮件 · 已授权的收件箱</option><option value="schedule">个人安排 · 本地日历与待办</option></select></label>
-                    <label>什么时候需要提醒你<textarea value={draft.instruction} maxLength={1500} rows={4} required disabled={busy} onChange={event => setDraft({...draft, instruction: event.target.value})}/></label>
+                    <label>什么时候需要提醒你<textarea className="resize-none" value={draft.instruction} maxLength={1500} rows={4} required disabled={busy} onChange={event => setDraft({...draft, instruction: event.target.value})}/></label>
                     <div className="assistant-form-row"><label>检查间隔（分钟）<input type="number" min={5} max={10080} required value={draft.intervalMinutes} disabled={busy} onChange={event => setDraft({...draft, intervalMinutes: Number(event.target.value)})}/></label>
                         <label className="assistant-check"><input type="checkbox" checked={draft.enabled} disabled={busy} onChange={event => setDraft({...draft, enabled: event.target.checked})}/>启用这项监控</label></div>
                     <label className="assistant-check"><input type="checkbox" checked={draft.includeMemory} disabled={busy} onChange={event => setDraft({...draft, includeMemory: event.target.checked})}/>加入相关的已启用个人记忆</label>
@@ -116,7 +120,7 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
             <section className="assistant-section" aria-labelledby="assistant-controls"><h3 id="assistant-controls">提醒与用量</h3>
                 <label className="assistant-check"><input type="checkbox" checked={state.settings.systemNotifications} disabled={!signedIn || busy} onChange={event => configure({systemNotifications: event.target.checked})}/>发现需要关注的变化时，发送系统提醒</label>
                 <p className="assistant-meta">系统提醒隐藏邮件内容；所有结论都保留在下方活动中。后台不会发送邮件或修改你的安排。</p>
-                <form className="assistant-budget" onSubmit={event => {event.preventDefault(); configure({dailyLimit: Number(dailyLimit)})}}><label>每日模型检查上限<input aria-label="每日模型检查上限" type="number" min={1} max={100} required value={dailyLimit} disabled={!signedIn || busy} onChange={event => setDailyLimit(event.target.value)}/></label><button type="submit" disabled={!signedIn || busy || dailyLimit === String(state.settings.dailyLimit)}>保存上限</button><span>今日已用 {state.usedToday} / {state.settings.dailyLimit} 次</span></form>
+                <form noValidate className="assistant-budget" onSubmit={event => {event.preventDefault(); try {validateAssistantSettings({...state.settings, dailyLimit: Number(dailyLimit)})} catch (error) {setError(error instanceof Error ? error.message : '请检查输入。'); return} configure({dailyLimit: Number(dailyLimit)})}}><label>每日模型检查上限<input aria-label="每日模型检查上限" type="number" min={1} max={100} required value={dailyLimit} disabled={!signedIn || busy} onChange={event => setDailyLimit(event.target.value)}/></label><button type="submit" disabled={!signedIn || busy || dailyLimit === String(state.settings.dailyLimit)}>保存上限</button><span>今日已用 {state.usedToday} / {state.settings.dailyLimit} 次</span></form>
                 <p className="assistant-meta">按北京时间零点重置。失败请求也计入上限；每次最多 1200 个输出 token。模型服务可能收费。</p>
             </section>
             <section className="assistant-section" aria-labelledby="assistant-activity"><div className="assistant-section-heading"><div><h3 id="assistant-activity">助手活动</h3><p>需要关注的结论会留在这里，直到你标为已读。</p></div>
@@ -130,7 +134,7 @@ export function AssistantPanel({onNavigate, onOpenMail}: {onNavigate: (tab: 'llm
                     {run.decision && <><p>{run.decision.summary}</p>{run.decision.nextStep && <p><strong>建议下一步：</strong>{run.decision.nextStep}</p>}</>}
                     {run.repeatOf && <p className="assistant-meta">与之前的提醒相同，未重复通知。</p>}
                     {run.error && <p className="assistant-hint">{run.error}{run.status === 'queued' ? ` 下次尝试：${date(run.retryAt)}（最多三次）。` : ''}</p>}
-                    <details><summary>查看本次检查依据</summary><p>独立上下文 · 第 {run.attempts} 次尝试{run.context ? ` · ${run.context.chars} 字符 · ${run.context.timezone}` : ''}</p>
+                    <details><summary>查看本次检查依据</summary><p>独立上下文 · 第 {run.attempts} 次尝试{run.model ? ` · ${run.model}` : ''}{run.context ? ` · ${run.context.chars} 字符 · ${run.context.timezone}` : ''}</p>
                         {run.context?.sources.map(source => <p key={source.ref}><strong>{source.ref}</strong> · {source.label}{source.truncated ? '（仅节选）' : ''}{run.decision?.evidence.includes(source.ref) ? ' · 本次结论引用' : ''}{source.id.startsWith('m2.') && <button type="button" disabled={busy} onClick={() => void openMail(source.id)}>打开原邮件</button>}</p>)}
                         {run.context?.gaps.map((gap, index) => <p key={index}>{gap}</p>)}
                         {!run.context && <p>尚未生成上下文；读取失败或已停止时不会生成成功结论。</p>}

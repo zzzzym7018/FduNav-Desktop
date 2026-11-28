@@ -18,6 +18,7 @@ export function registerAssistantHandlers(path: string, db: AppDatabase, account
     let notification: Notification | undefined
     const runtime = new AssistantRuntime(new AssistantStore(path), {
         owner, ready: () => {const settings = llm.get(); return settings.enabled && !!settings.baseUrl && !!settings.model},
+        model: () => llm.get().model,
         revision: username => mail.revision(username),
         accounts: async username => (await mail.monitorAccounts(username)).map(value => ({...value, signature: createHash('sha256').update(value.signature).digest('hex')})),
         poll: (username, id, cursor, signal) => mail.pollInbox(username, id, cursor, signal),
@@ -49,7 +50,12 @@ export function registerAssistantHandlers(path: string, db: AppDatabase, account
         },
         evaluate: async (messages, signal) => {
             const settingsSignal = llm.getRequestSignal(), connection = await llm.getConnection()
-            try {return await completeLlm(connection, messages, AbortSignal.any([signal, settingsSignal]), fetch, 1200)}
+            try {
+                const active = AbortSignal.any([signal, settingsSignal])
+                const result = await completeLlm(connection, messages, active, fetch, {maxTokens: 1200, retries: 0})
+                active.throwIfAborted()
+                return result
+            }
             finally {connection.apiKey = ''}
         },
         notify: () => {
@@ -58,7 +64,11 @@ export function registerAssistantHandlers(path: string, db: AppDatabase, account
             notification = new Notification({title: 'FduNav 主动助手', body: '发现需要你关注的变化，打开查看判断依据。'})
             notification.on('click', () => {
                 showWindow()
-                for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('assistant:open')
+                for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) {
+                    const open = () => {if (!window.isDestroyed()) window.webContents.send('assistant:open')}
+                    if (window.webContents.isLoadingMainFrame()) window.webContents.once('did-finish-load', open)
+                    else open()
+                }
             })
             notification.show()
         }

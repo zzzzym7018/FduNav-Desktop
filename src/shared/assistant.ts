@@ -10,8 +10,8 @@ export type AssistantDecision = {attention: boolean; title: string; summary: str
 export type AssistantRun = {
     id: string; monitorId: string; monitorName: string; trigger: string; createdAt: number; finishedAt?: number;
     status: 'queued' | 'running' | 'quiet' | 'attention' | 'failed' | 'cancelled'; attempts: number;
-    retryAt: number; refs: string[]; decision?: AssistantDecision; error?: string; read: boolean; repeatOf?: string;
-    context?: {version: 1; hash: string; chars: number; sources: {ref: string; id: string; label: string; truncated: boolean}[]; gaps: string[]; timezone: string}
+    retryAt: number; refs: string[]; model?: string; decision?: AssistantDecision; error?: string; read: boolean; repeatOf?: string;
+    context?: {version: 1; hash: string; chars: number; sources: {ref: string; id: string; label: string; hash: string; truncated: boolean}[]; gaps: string[]; timezone: string}
 }
 export type AssistantState = {
     username: string | null; settings: AssistantSettings; monitors: Monitor[]; runs: AssistantRun[];

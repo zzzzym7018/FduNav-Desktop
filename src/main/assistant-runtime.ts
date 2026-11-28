@@ -8,6 +8,7 @@ import type {ChatMessage} from './llm-connection'
 export interface AssistantDependencies {
     owner(): string | null
     ready(): boolean
+    model?(): string
     revision(owner: string): number
     accounts(owner: string): Promise<{id: string; signature: string}[]>
     poll(owner: string, id: string, previous: MailCheckpoint | undefined, signal: AbortSignal): Promise<{checkpoint: {validity: string; uid: number}; refs: string[]; baseline: boolean; hasMore?: boolean}>
@@ -34,7 +35,7 @@ export class AssistantRuntime {
     private afterStop?: () => void
     private changedListeners = new Set<() => void>()
     private now() {return this.deps.now?.() ?? Date.now()}
-    constructor(readonly store: AssistantStore, private deps: AssistantDependencies) {this.bus.subscribe(() => {void this.tick()})}
+    constructor(readonly store: AssistantStore, private deps: AssistantDependencies) {this.bus.subscribe(() => {if (this.timer) void this.tick().catch(() => console.warn('主动助手检查未完成，请在设置中查看状态。'))})}
     onChanged(callback: () => void) {this.changedListeners.add(callback); return () => {this.changedListeners.delete(callback)}}
     private changed() {for (const listener of this.changedListeners) {try {listener()} catch { /* Observer failure cannot fail a committed run. */ }}}
     start() {
@@ -149,8 +150,9 @@ export class AssistantRuntime {
                 } else {
                     const accounts = await bounded(this.deps.accounts(owner)); assert()
                     if (!accounts.length) throw new Error('mail_not_authorized')
-                    let backlog = false
+                    let backlog = false, failedAccounts = 0
                     for (const account of accounts.slice(0, 20)) {
+                        try {
                         const key = initial.id + ':' + account.id, previous = this.store.get(owner).cursors[key]
                         const result = await bounded(this.deps.poll(owner, account.id, previous?.signature === account.signature ? previous : undefined, signal)); assert()
                         this.store.transaction(() => {
@@ -165,10 +167,13 @@ export class AssistantRuntime {
                         // Preserve later account cursors until the existing batch is consumed.
                         if (result.hasMore) backlog = true
                         if (backlog) break
+                        } catch {assert(); failedAccounts++}
                     }
                     const doc = this.store.get(owner), monitor = doc.monitors.find(m => m.id === initial.id)!
-                    monitor.nextAt = this.now() + (backlog ? 30000 : monitor.intervalMinutes * 60000)
-                    monitor.failures = 0; this.store.save(owner, doc)
+                    monitor.failures = failedAccounts ? monitor.failures + 1 : 0
+                    monitor.nextAt = this.now() + (backlog ? 30000 : failedAccounts ? Math.min(60, 2 ** Math.min(monitor.failures, 6)) * 60000 : monitor.intervalMinutes * 60000)
+                    if (failedAccounts) this.store.putRun(owner, {id: randomUUID(), monitorId: monitor.id, monitorName: monitor.name, trigger: '检查来源', createdAt: this.now(), status: 'failed', attempts: 0, refs: [], retryAt: 0, read: false, error: `${failedAccounts} 个邮箱暂时无法读取；其他邮箱继续检查，失败邮箱的进度保持不变。`})
+                    this.store.save(owner, doc)
                 }
                 } catch (error) {
                     assert()
@@ -188,7 +193,7 @@ export class AssistantRuntime {
             if (!active) return
             const monitor = doc.monitors.find(m => m.id === active!.monitorId && m.enabled)
             if (!monitor) {active.status = 'cancelled'; this.store.putRun(owner, active); return}
-            active.status = 'running'; active.attempts++; this.store.putRun(owner, active); this.changed()
+            active.status = 'running'; active.model = this.deps.model?.().slice(0, 120); active.attempts++; this.store.putRun(owner, active); this.changed()
             const sources = await bounded(this.deps.sources(owner, monitor, active.refs, signal)); assert()
             const context = buildAssistantContext(monitor, active.trigger, sources.items, sources.gaps, this.now())
             active.context = context.manifest; this.store.putRun(owner, active)
@@ -198,8 +203,8 @@ export class AssistantRuntime {
             const decision = parseAssistantDecision(raw, context.manifest.sources.map(source => source.ref), context.manifest.gaps.length > 0 || context.manifest.sources.some(source => source.truncated))
             const duplicate = decision.attention ? this.store.runs(owner).find(run => run.status === 'attention' && run.monitorId === monitor.id && run.createdAt > this.now() - 86400000 &&
                 run.decision?.title === decision.title && run.decision?.nextStep === decision.nextStep &&
-                JSON.stringify(run.context?.sources.filter(source => run.decision?.evidence.includes(source.ref)).map(source => source.id).sort()) ===
-                JSON.stringify(context.manifest.sources.filter(source => decision.evidence.includes(source.ref)).map(source => source.id).sort())) : undefined
+                JSON.stringify(run.context?.sources.filter(source => run.decision?.evidence.includes(source.ref)).map(source => [source.id, source.hash]).sort()) ===
+                JSON.stringify(context.manifest.sources.filter(source => decision.evidence.includes(source.ref)).map(source => [source.id, source.hash]).sort())) : undefined
             if (duplicate) {active.repeatOf = duplicate.id; active.read = true}
             active.decision = decision; active.status = decision.attention ? 'attention' : 'quiet'; active.error = undefined; active.finishedAt = this.now()
             this.store.transaction(() => {
@@ -210,7 +215,7 @@ export class AssistantRuntime {
             if (decision.attention && !duplicate && this.store.get(owner).settings.systemNotifications) {try {this.deps.notify(active)} catch { /* In-app activity remains the source of truth. */ }}
         } catch (error) {
             const cancelled = !valid() && !deadline.aborted
-            const canResume = cancelled && !this.stopped && this.deps.owner() === owner && this.store.get(owner).settings.enabled
+            const canResume = cancelled && (this.stopped || this.deps.owner() === owner && this.store.get(owner).settings.enabled)
             if (active) {
                 // Disabling/removing/account changes may already have cancelled this durable job.
                 const saved = this.store.runs(owner).find(run => run.id === active!.id)

@@ -32,10 +32,10 @@ export interface ChatTool {
 }
 
 export async function completeLlm(connection: Connection, messages: ChatMessage[], signal: AbortSignal,
-                                  request: typeof fetch = fetch, maxTokens?: number): Promise<string> {
+                                  request: typeof fetch = fetch, options: {maxTokens?: number; retries?: number} = {}): Promise<string> {
     const data = await requestLlmJson(connection, '/chat/completions', {
-        method: 'POST', body: JSON.stringify({model: connection.model, messages, stream: false, ...(maxTokens ? {max_tokens: maxTokens} : {})}),
-    }, request, 60_000, signal)
+        method: 'POST', body: JSON.stringify({model: connection.model, messages, stream: false, ...(options.maxTokens ? {max_tokens: options.maxTokens} : {})}),
+    }, request, 60_000, signal, options.retries)
     const payload = data as { error?: unknown; choices?: { message?: { content?: unknown } }[] } | null
     const content = Array.isArray(payload?.choices) ? payload.choices[0]?.message?.content : undefined
     if (payload?.error || typeof content !== 'string' || !content.trim()) throw new Error('模型未返回有效内容。')
@@ -86,12 +86,12 @@ class TransientLlmError extends Error {
 }
 
 async function requestLlmJson(connection: Connection, path: string, init: RequestInit,
-                              request: typeof fetch, timeoutMs: number, enabledSignal?: AbortSignal): Promise<unknown> {
+                              request: typeof fetch, timeoutMs: number, enabledSignal?: AbortSignal, retries = 2): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
         try {
             return await requestLlmJsonOnce(connection, path, init, request, timeoutMs, enabledSignal)
         } catch (error) {
-            if (!(error instanceof TransientLlmError) || attempt >= 2 || enabledSignal?.aborted) throw error
+            if (!(error instanceof TransientLlmError) || attempt >= retries || enabledSignal?.aborted) throw error
             await new Promise<void>((resolve, reject) => {
                 const abort = () => {
                     clearTimeout(timer);

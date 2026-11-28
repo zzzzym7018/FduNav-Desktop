@@ -20,11 +20,7 @@ export class MailService {
     }
 
     revision(owner: string) { return this.accounts.revision(owner) }
-    async monitorAccounts(owner: string) {
-        this.accounts.owner(owner)
-        return (await this.accounts.list()).filter(account => account.enabled).map(account => ({id: account.id,
-            signature: JSON.stringify([account.id, account.address, account.host, account.port, account.username, account.lastVerifiedAt])}))
-    }
+    monitorAccounts(owner: string) {return this.accounts.monitorAccounts(owner)}
     pollInbox(owner: string, id: string, previous: {validity: string; uid: number} | undefined, signal: AbortSignal) {
         return this.client.pollInbox(owner, id, previous, signal)
     }

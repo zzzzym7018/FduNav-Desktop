@@ -19,7 +19,7 @@
 .assistant-form { display: grid; gap: var(--space-4); padding: var(--space-4); margin-top: var(--space-4); background: var(--color-bg-subtle); border: 1px solid var(--color-border-default); border-radius: var(--radius-md); }
 .assistant-form label, .assistant-budget label { display: grid; gap: var(--space-2); font-size: var(--font-size-sm); }
 .assistant-panel input:not([type=checkbox]), .assistant-panel select, .assistant-panel textarea { min-width: 0; width: 100%; max-width: 100%; min-height: var(--size-touch-target); padding: var(--space-2) var(--space-3); color: var(--color-text-primary); background: var(--color-bg-surface); border: 1px solid var(--color-border-control); border-radius: var(--radius-md); font: inherit; }
-.assistant-panel textarea { resize: vertical; }
+.assistant-panel textarea.resize-none { resize: none; min-height: 9rem; }
 .assistant-form-row, .assistant-budget { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; }
 .assistant-form-row > label { flex: 1; min-width: 10rem; }
 .assistant-panel label.assistant-check { display: flex; gap: var(--space-2); align-items: center; min-height: var(--size-touch-target); }

@@ -4,7 +4,7 @@ import type {SecretStorage} from './llm-settings'
 import {type MailAccount, type MailAccountInput, type MailInput, validateMailAccount} from '../shared/mail'
 import {MailError, safeMailError} from './mail-errors'
 
-export type StoredMailAccount = MailAccountInput & { id: string; lastVerifiedAt: string }
+export type StoredMailAccount = MailAccountInput & { id: string; lastVerifiedAt: string; agentEpoch?: string }
 type AccountDocument = { version: 2; accounts: StoredMailAccount[] }
 type Repository = Pick<AppDatabase, 'getMailConfiguration' | 'saveMailConfiguration' | 'clearMailConfiguration'>
 export type MailAccountVerifier = (account: StoredMailAccount, signal: AbortSignal) => Promise<void>
@@ -57,6 +57,16 @@ export class MailAccounts {
         }
     }
 
+    async monitorAccounts(owner: string) {
+        this.owner(owner)
+        const revision = this.revision(owner), accounts = await this.load(owner)
+        try {
+            this.assert(owner, revision)
+            return accounts.filter(account => account.enabled).map(account => ({id: account.id,
+                signature: JSON.stringify([account.id, account.address, account.host, account.port, account.username, account.lastVerifiedAt, account.agentEpoch ?? 'legacy'])}))
+        } finally {accounts.forEach(clear)}
+    }
+
     async test(raw: unknown): Promise<{ smtp: boolean }> {
         return this.setupAccount(raw, false) as Promise<{ smtp: boolean }>
     }
@@ -77,6 +87,7 @@ export class MailAccounts {
             try {
                 const account = accounts.find(item => item.id === id)
                 if (!account) throw new MailError('not_found', '邮箱账号不存在。')
+                if (account.enabled !== enabled) account.agentEpoch = randomBytes(12).toString('base64url')
                 account.enabled = enabled
                 await this.persist(owner, revision, accounts);
                 return this.present(account)
@@ -161,7 +172,7 @@ export class MailAccounts {
                 if (!checked.ok || !checked.data.password || !checked.data.id || ids.has(checked.data.id) ||
                     typeof raw.lastVerifiedAt !== 'string' || !Number.isFinite(Date.parse(raw.lastVerifiedAt))) throw new Error()
                 ids.add(checked.data.id)
-                return {...checked.data, id: checked.data.id, lastVerifiedAt: raw.lastVerifiedAt}
+                return {...checked.data, id: checked.data.id, lastVerifiedAt: raw.lastVerifiedAt, ...(typeof raw.agentEpoch === 'string' && /^[a-zA-Z0-9_-]{16}$/.test(raw.agentEpoch) ? {agentEpoch: raw.agentEpoch} : {})}
             })
         } catch {
             throw new MailError('forbidden', '无法解密邮箱设置，请检查系统安全存储。原有账号未被覆盖。')
@@ -169,7 +180,7 @@ export class MailAccounts {
     }
 
     private present(account: StoredMailAccount): MailAccount {
-        const {password: _password, smtp, ...rest} = account
+        const {password: _password, smtp, agentEpoch: _epoch, ...rest} = account
         return {
             ...rest,
             configured: true,
@@ -206,7 +217,8 @@ export class MailAccounts {
         return {
             ...input,
             id: saved && sameEndpoint(input, saved) ? saved.id : randomBytes(12).toString('base64url'),
-            lastVerifiedAt: saved?.lastVerifiedAt ?? new Date().toISOString()
+            lastVerifiedAt: saved?.lastVerifiedAt ?? new Date().toISOString(),
+            agentEpoch: saved && saved.enabled === input.enabled ? saved.agentEpoch : randomBytes(12).toString('base64url')
         }
     }
 

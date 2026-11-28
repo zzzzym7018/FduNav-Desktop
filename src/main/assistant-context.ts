@@ -17,14 +17,21 @@ export function buildAssistantContext(monitor: Monitor, trigger: string, sources
         remaining -= text.length
         rows.push({ref: `S${rows.length + 1}`, id: source.id, label: source.label.slice(0, 120), text, truncated: !!source.truncated || text.length < source.text.length})
     }
+    if (sources.length > 60) gaps = [...gaps, '来源数量超过本次上限。']
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     // Stable compact DTO, never serialize service/database/transport objects.
-    const content = JSON.stringify({version: 1, now: new Date(now).toISOString(), timezone, trigger: trigger.slice(0, 100),
+    const serialize = () => JSON.stringify({version: 1, now: new Date(now).toISOString(), timezone, trigger: trigger.slice(0, 100),
         task: {name: monitor.name, goal: monitor.instruction}, previousConclusion: monitor.note.slice(0, 600),
         sources: rows.map(({id: _id, ...row}) => row), coverageGaps: [...new Set(gaps)].slice(0, 15)})
-    if (content.length > 28000) throw new Error('context_budget')
-    const manifest: NonNullable<AssistantRun['context']> = {version: 1, hash: createHash('sha256').update(content).digest('hex'), chars: content.length,
-        timezone, sources: rows.map(({text: _text, ...row}) => row), gaps: [...new Set(gaps)].slice(0, 15)}
+    let content = serialize()
+    while (content.length + decisionPrompt.length > 28000 && rows.length) {
+        rows.pop()
+        gaps = [...new Set([...gaps, '上下文容量不足，部分资料未送入模型。'])]
+        content = serialize()
+    }
+    if (content.length + decisionPrompt.length > 28000) throw new Error('context_budget')
+    const manifest: NonNullable<AssistantRun['context']> = {version: 1, hash: createHash('sha256').update(decisionPrompt + '\n' + content).digest('hex'), chars: content.length + decisionPrompt.length,
+        timezone, sources: rows.map(({text, ...row}) => ({...row, hash: createHash('sha256').update(text).digest('hex')})), gaps: [...new Set(gaps)].slice(0, 15)}
     return {messages: [{role: 'system', content: decisionPrompt}, {role: 'user', content}] as ChatMessage[], manifest}
 }
 export function parseAssistantDecision(raw: string, refs: string[], incomplete = false): AssistantDecision {

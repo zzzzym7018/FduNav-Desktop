@@ -1,0 +1,202 @@
+{
+  "scope": "whole renderer; existing findings retained",
+  "summary": {
+    "errors": 21,
+    "total": 21,
+    "unresolved": 0,
+    "violations": 21,
+    "warnings": 0
+  },
+  "newAssistantFindings": [],
+  "findings": [
+    {
+      "category": "violation",
+      "file": "src/renderer/src/DashboardPage.tsx",
+      "line": 299,
+      "message": "Enabled literal button has no detectable action or submit behavior.",
+      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
+      "ruleId": "affordance.actionless-button",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/SourcesPanel.tsx",
+      "line": 146,
+      "message": "Enabled literal button has no detectable action or submit behavior.",
+      "remediation": "Connect the button to a real action, make it a submit button, or disable/remove it.",
+      "ruleId": "affordance.actionless-button",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "premium-ui.json",
+      "line": null,
+      "message": "Required runtime verification command is missing: npm run build.",
+      "remediation": "Configure commands.npm run build and run it separately; the static auditor will not execute it.",
+      "ruleId": "evidence.command-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "premium-ui.json",
+      "line": null,
+      "message": "Required runtime verification command is missing: npm run test:assistant.",
+      "remediation": "Configure commands.npm run test:assistant and run it separately; the static auditor will not execute it.",
+      "ruleId": "evidence.command-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "premium-ui.json",
+      "line": null,
+      "message": "Required runtime verification command is missing: npm run typecheck.",
+      "remediation": "Configure commands.npm run typecheck and run it separately; the static auditor will not execute it.",
+      "ruleId": "evidence.command-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/AccountPanel.tsx",
+      "line": 73,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/CalendarEventDialog.tsx",
+      "line": 157,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/ChatHistory.tsx",
+      "line": 110,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/ChatPage.tsx",
+      "line": 574,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/LlmPanel.tsx",
+      "line": 202,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/MemoryDialog.tsx",
+      "line": 61,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/TodoDialog.tsx",
+      "line": 38,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/WebSearchPanel.tsx",
+      "line": 100,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/CalendarEventDialog.tsx",
+      "line": 185,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/ChatPage.tsx",
+      "line": 575,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/LlmPanel.tsx",
+      "line": 272,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/LlmPanel.tsx",
+      "line": 295,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/MailComposer.tsx",
+      "line": 292,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/MemoryDialog.tsx",
+      "line": 62,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/MemoryDialog.tsx",
+      "line": 64,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "src/renderer/src/TodoDialog.tsx",
+      "line": 58,
+      "message": "Literal product textarea does not show evidence of the canonical resize-none rule.",
+      "remediation": "Use the shared Textarea owner or apply resize-none/resize: none with adequate height or auto-grow behavior.",
+      "ruleId": "form.textarea-resize-missing",
+      "severity": "error"
+    }
+  ]
+}

@@ -62,6 +62,7 @@ export default function App({runtime, openPlugins = false, pluginStartupError}: 
     const [mailToOpen, setMailToOpen] = useState<MailItem | null>(null)
     const [calendarInitialView, setCalendarInitialView] = useState<CalendarView>('week')
     const [tab, setTab] = useState<Tab>(openPlugins ? 'plugins' : 'general')
+    const [assistantUnread, setAssistantUnread] = useState(0)
     const [account, setAccount] = useState<AccountState | null>(null)
     const [unreadState, setUnreadState] = useState<{ username: string | null; unread: boolean }>({
         username: null,
@@ -104,6 +105,22 @@ export default function App({runtime, openPlugins = false, pluginStartupError}: 
     }, [])
 
     useEffect(() => window.assistant?.onOpen(() => {setTab('assistant'); setSettings(true)}), [])
+    useEffect(() => {
+        const api = window.assistant
+        if (!api || account?.status !== 'signed-in') {setAssistantUnread(0); return}
+        let active = true, sequence = 0
+        const refresh = async () => {
+            const request = ++sequence
+            try {
+                const result = await api.get()
+                if (active && request === sequence && result.ok && result.data.username === account.username) setAssistantUnread(result.data.runs.filter(run => run.status === 'attention' && !run.read).length)
+            } catch { /* The settings panel owns recoverable assistant errors. */ }
+        }
+        void refresh()
+        const unsubscribe = api.onChanged(() => void refresh())
+        return () => {active = false; unsubscribe()}
+    }, [account?.username, account?.status])
+
 
     useEffect(() => {
         if (needsLogin) setTab(current => current === 'plugins' ? current : 'account')
@@ -261,8 +278,8 @@ export default function App({runtime, openPlugins = false, pluginStartupError}: 
                     }}/>
                     <button type="button" ref={settingsButton}
                             className={`icon-button rail-button ${showSettings ? 'is-active' : ''}`}
-                            aria-label="设置" title="设置" aria-current={showSettings ? 'page' : undefined}
-                            onClick={() => setSettings(true)}><Icon name="settings"/></button>
+                            aria-label={assistantUnread ? `设置 · ${assistantUnread} 条助手待关注` : '设置'} title={assistantUnread ? `设置 · ${assistantUnread} 条助手待关注` : '设置'} aria-current={showSettings ? 'page' : undefined}
+                            onClick={() => setSettings(true)}><Icon name="settings"/>{assistantUnread > 0 && <span className="rail-unread-dot" aria-hidden="true"/>}</button>
                 </div>
             </nav>
 
