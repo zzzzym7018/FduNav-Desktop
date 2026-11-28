@@ -1,3 +1,4 @@
+import type {AssistantAPI} from '../../shared/assistant'
 import type {AccountAPI} from '../../shared/accounts'
 import type {NoticesAPI} from '../../shared/notices'
 import type {MessagePreferencesAPI} from '../../shared/message-preferences'
@@ -19,6 +20,7 @@ import type {ResearchAPI} from '../../shared/research'
 
 declare global {
     interface Window {
+        assistant?: AssistantAPI
         mail?: MailAPI
         library?: LibraryAPI
         weather?: WeatherAPI

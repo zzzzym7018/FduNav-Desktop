@@ -28,7 +28,9 @@ import {registerWeatherHandlers} from './weather'
 import {registerGeneralSettingsHandlers} from './general-settings'
 import {registerAppInfoHandlers} from './app-info'
 import {registerResearchHandlers} from './research'
+import {registerAssistantHandlers} from './assistant'
 
+let stopAssistant: (() => void) | undefined
 let database: AppDatabase | undefined
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -185,6 +187,7 @@ app.whenReady().then(async () => {
         const notices = registerNoticeHandlers(database, accounts, llm, trusted, showMainWindow)
         const mail = registerMailHandlers(database, accounts, trusted)
         registerChatHandlers(database, accounts, llm, notices, calendar, todos, mail, research, trusted)
+        stopAssistant = registerAssistantHandlers(join(app.getPath('userData'), 'assistant.sqlite'), database, accounts, llm, mail, trusted, showMainWindow)
         registerMessagePreferenceHandlers(database, trusted)
     } catch (error) {
         console.error('FduNav 启动失败', error)
@@ -198,6 +201,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('will-quit', () => {
+    stopAssistant?.()
     tray?.destroy()
     database?.close()
 })

@@ -19,6 +19,16 @@ export class MailService {
     constructor(private accounts: MailAccounts, private client: MailClient, private transport: MailTransport = createMailTransport()) {
     }
 
+    revision(owner: string) { return this.accounts.revision(owner) }
+    async monitorAccounts(owner: string) {
+        this.accounts.owner(owner)
+        return (await this.accounts.list()).filter(account => account.enabled).map(account => ({id: account.id,
+            signature: JSON.stringify([account.id, account.address, account.host, account.port, account.username, account.lastVerifiedAt])}))
+    }
+    pollInbox(owner: string, id: string, previous: {validity: string; uid: number} | undefined, signal: AbortSignal) {
+        return this.client.pollInbox(owner, id, previous, signal)
+    }
+
     async list(owner: string, input: MailListInput = {}, signal?: AbortSignal): Promise<MailListResult> {
         this.accounts.owner(owner)
         const revision = this.accounts.revision(owner)

@@ -15,6 +15,7 @@ import {MailboxPage} from './MailboxPage'
 import {NotificationSettingsPanel} from './NotificationSettingsPanel'
 import {SummaryQueuePanel} from './SummaryQueuePanel'
 import {AboutPanel} from './AboutPanel'
+import {AssistantPanel} from './AssistantPanel'
 import {DashboardPage} from './DashboardPage'
 import {ChatPage} from './ChatPage'
 import type {Notice} from '../../shared/notices'
@@ -27,6 +28,7 @@ import './styles/app.css'
 const tabs = [
     {id: 'general', label: '通用', icon: 'settings'},
     {id: 'notifications', label: '通知', icon: 'notices'},
+    {id: 'assistant', label: '主动助手', icon: 'processor'},
     {id: 'account', label: '账号', icon: 'user'},
     {id: 'messages', label: '消息偏好', icon: 'tag'},
     {id: 'sources', label: '消息来源', icon: 'folder'},
@@ -83,6 +85,8 @@ export default function App() {
             active = false
         }
     }, [])
+
+    useEffect(() => window.assistant?.onOpen(() => {setTab('assistant'); setSettings(true)}), [])
 
     useEffect(() => {
         if (needsLogin) setTab('account')
@@ -212,6 +216,11 @@ export default function App() {
                                 <section className="settings-panel" role="tabpanel" id={`settings-panel-${tab}`}
                                          aria-labelledby={`settings-tab-${tab}`} tabIndex={0}>
                                     {tab === 'general' && showSettings && <GeneralPanel/>}
+                                    {tab === 'assistant' && showSettings && <AssistantPanel key={account?.username ?? 'signed-out'} onNavigate={setTab} onOpenMail={async id => {
+                                        const result = await window.mail?.message({id, markRead: false})
+                                        if (!result?.ok) throw new Error('无法打开原邮件')
+                                        setMailToOpen(result.data); openPage('mail')
+                                    }}/>}
                                     {tab === 'notifications' && showSettings && <NotificationSettingsPanel/>}
                                     {tab === 'account' && <AccountPanel account={account} onChange={setAccount}/>}
                                     {tab === 'about' && <AboutPanel/>}

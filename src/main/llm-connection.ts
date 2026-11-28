@@ -32,9 +32,9 @@ export interface ChatTool {
 }
 
 export async function completeLlm(connection: Connection, messages: ChatMessage[], signal: AbortSignal,
-                                  request: typeof fetch = fetch): Promise<string> {
+                                  request: typeof fetch = fetch, maxTokens?: number): Promise<string> {
     const data = await requestLlmJson(connection, '/chat/completions', {
-        method: 'POST', body: JSON.stringify({model: connection.model, messages, stream: false}),
+        method: 'POST', body: JSON.stringify({model: connection.model, messages, stream: false, ...(maxTokens ? {max_tokens: maxTokens} : {})}),
     }, request, 60_000, signal)
     const payload = data as { error?: unknown; choices?: { message?: { content?: unknown } }[] } | null
     const content = Array.isArray(payload?.choices) ? payload.choices[0]?.message?.content : undefined

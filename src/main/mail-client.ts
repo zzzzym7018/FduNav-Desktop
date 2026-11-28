@@ -35,6 +35,22 @@ const streamKey = (id: string, folder: string) => id + ':' + Buffer.from(folder)
 export class MailClient {
     private sending = new Set<string>()
 
+    /** Incremental read-only inbox polling. UID ranges are ascending to drain backlogs without gaps. */
+    async pollInbox(owner: string, id: string, previous: {validity: string; uid: number} | undefined, signal: AbortSignal) {
+        this.accounts.owner(owner)
+        return this.imap(owner, id, true, async client => {
+            const box = await client.mailboxOpen('INBOX', {readOnly: true})
+            const validity = box.uidValidity.toString(), upper = Math.max(0, box.uidNext - 1)
+            if (!previous || previous.validity !== validity) return {checkpoint: {validity, uid: upper}, refs: [], baseline: true}
+            if (upper <= previous.uid) return {checkpoint: {validity, uid: previous.uid}, refs: [], baseline: false}
+            const scannedUpper = Math.min(upper, previous.uid + 500)
+            const found = await client.search({uid: `${previous.uid + 1}:${scannedUpper}`, deleted: false}, {uid: true})
+            const uids = (found || []).filter(uid => uid > previous.uid && uid <= scannedUpper).sort((a, b) => a - b).slice(0, 10)
+            const nextUid = uids.at(-1) ?? scannedUpper
+            return {checkpoint: {validity, uid: nextUid}, hasMore: nextUid < upper, refs: uids.map(uid => `m2.${id}.SU5CT1g.${validity}.${uid}`), baseline: false}
+        }, signal)
+    }
+
     constructor(readonly accounts: MailAccounts, readonly drafts: MailDrafts,
                 private factory: (options: ReturnType<typeof mailConnectionOptions>) => ImapFlow = options => new ImapFlow(options),
                 private deliver: typeof deliverMail = deliverMail) {

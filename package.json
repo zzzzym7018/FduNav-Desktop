@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",
     "build:win": "node -e \"require.resolve('@napi-rs/canvas-win32-x64-msvc')\" && npm run build && npx --yes electron-builder@26.18.0 --win --x64 --publish never",
-    "build:mac": "node -e \"require.resolve('@napi-rs/canvas-darwin-arm64')\" && npm run build && npx --yes electron-builder@26.18.0 --mac --arm64 --publish never"
+    "build:mac": "node -e \"require.resolve('@napi-rs/canvas-darwin-arm64')\" && npm run build && npx --yes electron-builder@26.18.0 --mac --arm64 --publish never",
+    "test:assistant": "node --experimental-transform-types --import ./tests/register.mjs --test tests/assistant.test.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

@@ -1,3 +1,4 @@
+import type {AssistantAPI} from '../shared/assistant'
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron'
 import type {AccountAPI} from '../shared/accounts'
 import type {NoticesAPI, SummaryTask} from '../shared/notices'
@@ -233,3 +234,24 @@ contextBridge.exposeInMainWorld('windowControls', {
         return () => ipcRenderer.removeListener('window:maximized-changed', listener)
     },
 })
+
+const assistant: AssistantAPI = {
+    get: () => ipcRenderer.invoke('assistant:get'),
+    configure: input => ipcRenderer.invoke('assistant:configure', input),
+    saveMonitor: input => ipcRenderer.invoke('assistant:save-monitor', input),
+    removeMonitor: id => ipcRenderer.invoke('assistant:remove-monitor', id),
+    check: id => ipcRenderer.invoke('assistant:check', id),
+    retry: id => ipcRenderer.invoke('assistant:retry', id),
+    cancel: () => ipcRenderer.invoke('assistant:cancel'),
+    markRead: id => ipcRenderer.invoke('assistant:mark-read', id),
+    clearHistory: () => ipcRenderer.invoke('assistant:clear-history'),
+    onChanged: callback => {
+        const listener = () => callback(); ipcRenderer.on('assistant:changed', listener)
+        return () => {ipcRenderer.removeListener('assistant:changed', listener)}
+    },
+    onOpen: callback => {
+        const listener = () => callback(); ipcRenderer.on('assistant:open', listener)
+        return () => {ipcRenderer.removeListener('assistant:open', listener)}
+    }
+}
+contextBridge.exposeInMainWorld('assistant', assistant)
